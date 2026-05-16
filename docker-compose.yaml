@@ -1,0 +1,22 @@
+services:
+  velociraptor-server:
+    #image: ghcr.io/velocidex/velociraptor-server:latest
+    build:
+      context: .
+      dockerfile: Dockerfile # Assicurati che il file si chiami così nel repo  
+    container_name: velociraptor
+    ports:
+      - "${VELOCIRAPTOR_FRONTEND_PORT}:${VELOCIRAPTOR_FRONTEND_PORT}"
+      - "${VELOCIRAPTOR_GUI_PORT}:${VELOCIRAPTOR_GUI_PORT}"
+    environment:
+      - VELOCIRAPTOR_HOSTNAME=${VELOCIRAPTOR_HOSTNAME}
+      - VELOCIRAPTOR_FRONTEND_PORT=${VELOCIRAPTOR_FRONTEND_PORT}
+      - VELOCIRAPTOR_GUI_PORT=${VELOCIRAPTOR_GUI_PORT}
+      - VELOCIRAPTOR_DATASTORE_PATH=${VELOCIRAPTOR_DATASTORE_PATH}
+      - VELOCIRAPTOR_CONFIG_PATH=${VELOCIRAPTOR_CONFIG_PATH}
+      - VELOCIRAPTOR_INITIAL_ADMIN_PASSWORD=${VELOCIRAPTOR_INITIAL_ADMIN_PASSWORD}
+    volumes:
+      - ./bin:/velobins:ro
+      - ./etc/:/etc/velociraptor/
+      - ./datastore/:/datastore/
+      - ./custom_artifacts:/etc/velociraptor/custom_artifacts

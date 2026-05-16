@@ -1,0 +1,63 @@
+// This is the initial VQL to bootstrap the container.
+
+LET _Exe <= SELECT * FROM info()
+LET Exe <= _Exe[0].Exe
+LET OrgName <= environ(var="VELOCIRAPTOR_ORGNAME") || "root"  
+LET org_record <= org_create(name=OrgName)
+LET AdminUser <= environ(var="VELOCIRAPTOR_INITIAL_ADMIN_USER") || "admin"
+LET AdminPassword <= environ(var="VELOCIRAPTOR_INITIAL_ADMIN_PASSWORD") || "password"
+LET Hostname <= environ(var="VELOCIRAPTOR_HOSTNAME") || "localhost"
+LET FrontendPort <= environ(var="VELOCIRAPTOR_FRONTEND_PORT") || "8000"
+LET GUIPort <= environ(var="VELOCIRAPTOR_GUI_PORT") || "8889"
+LET Datastore <= environ(var="VELOCIRAPTOR_DATASTORE_PATH") || "/datastore/"
+LET ConfFile <= environ(var="VELOCIRAPTOR_CONFIG_PATH") || "/etc/velociraptor/server.config.yaml"
+LET InitArtifacts <= if(condition=NOT environ(var="VELOCIRAPTOR_NO_INITIALIZE"),
+  then=["Container.InitializeServer",])
+
+LET ToolDir <= environ(var="VELOCIRAPTOR_TOOLDIR") || "/velobins"
+
+LET JsonPatch <= dict(
+Client=dict(
+   server_urls= [
+     url(scheme="wss", host=Hostname + ":" + FrontendPort).String + "/",
+     url(scheme="https", host=Hostname + ":" + FrontendPort).String + "/",
+   ]
+),
+GUI=dict(
+  bind_address="0.0.0.0",
+  public_url= url(scheme="https",
+    host=Hostname + ":" + GUIPort).String + "/app/index.html"
+  ),
+Frontend=dict(initial_server_artifacts=InitArtifacts),
+Datastore=dict(
+  location=Datastore,
+  filestore_directory=Datastore
+  ),
+defaults=dict(
+    artifact_definitions_directories=["/custom_artifacts/",]
+  )
+)
+
+SELECT JsonPatch FROM scope()
+
+// Generate a new base configuration and write to disk
+SELECT Hostname, Stdout AS OutputConfig
+FROM execve(argv=["/bin/sh", "-c",
+   format(format="mkdir -p $(dirname '%s') && %s config generate --merge '%s' | tee '%s'",
+     args=[ConfFile, Exe, serialize(item=JsonPatch), ConfFile])
+], length=100000)
+
+// Create admin user via CLI
+SELECT Stdout, Stderr AS UserCreated
+FROM execve(argv=[Exe,
+    "--config", ConfFile,
+    "user", "add", AdminUser, AdminPassword,
+    "--role", "administrator"
+], length=10000)
+
+
+// Generate a new base configuration
+//SELECT Hostname, write_file(data=Stdout,
+//    filename=ConfFile, create_directories=TRUE) AS OutputConfig
+//FROM execve(argv=[Exe, "config", "generate",
+//   "--merge", JsonPatch], length=100000)

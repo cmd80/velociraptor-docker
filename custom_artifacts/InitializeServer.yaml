@@ -1,0 +1,41 @@
+name: Container.InitializeServer
+description: |
+  This is the initial server artifact that will be launched on first start.
+
+  By default we prepare installation packages but you can do anything
+  here if you modify it.
+
+  To modify this artifact, copy it to a new directory, then launch the
+  container with a volume mount over the custom_artifacts directory. e.g.
+
+  docker run ... --mount type=volume,src=my_custom_dir,target=/custom_dir/,ro ...
+
+type: SERVER
+
+sources:
+- query: |
+    LET _ <= log(message="Waiting for server to become ready") AND sleep(time=3)
+
+    SELECT * FROM chain(a={
+       SELECT inventory_add(
+          tool="VelociraptorLinux",
+          file="/velobins/velociraptor-v0.76.5-linux-amd64-musl",
+          filename="velociraptor-v0.76.5-linux-amd64-musl"
+        ) FROM scope()
+      }, b={
+        SELECT inventory_add(
+          tool="VelociraptorWindowsMSI",
+          file="/velobins/velociraptor-v0.76.5-windows-amd64.exe",
+          filename="velociraptor-v0.76.5-windows-amd64.exe"
+        ) FROM scope()
+      }, c={
+        SELECT * FROM Artifact.Server.Utils.CreateMSI()
+      }, d={
+        SELECT * FROM Artifact.Server.Utils.CreateLinuxPackages()
+      }, e={
+        SELECT * FROM server_set_monitoring(
+          artifact="Label.Info",
+          op="set"
+        ) FROM scope()
+      })
+
